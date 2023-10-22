@@ -21,15 +21,10 @@ const server = createServer(
   },
   (connection) => {
     console.log("Client connected");
-
+    fetchProcesses(connection);
     setInterval(() => {
-      exec("ps -eo pid,%cpu,%mem,command,args --sort=-%cpu").then((out) => {
-        const parse = getProcesses(out.stdout);
-        connection.write(
-          "[command][ps]" + JSON.stringify(parse) + "[/command]"
-        );
-      });
-    }, 60000);
+      fetchProcesses(connection);
+    }, 30000);
 
     connection.on("data", (data) => {
       // the commands are in the form of [command]${command}[/command], one buffer can contain multiple commands
@@ -55,7 +50,6 @@ server.listen(socketPath, () => {
 });
 
 function handleCommand(command: string, connection: Socket) {
-  console.log("Command received", command);
   if (command.startsWith("[spawn]")) {
     const uuid = randomUUID();
     const terminal = childProcess.spawn("/bin/sh");
@@ -83,6 +77,8 @@ function handleCommand(command: string, connection: Socket) {
       terminal.kill();
       map.delete(uuid);
     }
+  } else if (command.startsWith("[ps]")) {
+    fetchProcesses(connection);
   } else {
     console.log("Unknown command", command);
   }
@@ -95,7 +91,14 @@ type ProcessInfo = {
   command: string;
 };
 
-function getProcesses(out: string): ProcessInfo[] {
+function fetchProcesses(connection: Socket) {
+  exec("ps -eo pid,%cpu,%mem,command,args --sort=-%cpu").then((out) => {
+    const parse = parseProcesses(out.stdout);
+    connection.write("[command][ps]" + JSON.stringify(parse) + "[/command]");
+  });
+}
+
+function parseProcesses(out: string): ProcessInfo[] {
   const lines = out.trim().split("\n").slice(1);
 
   const processes: ProcessInfo[] = lines.map((line) => {
