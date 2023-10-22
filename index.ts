@@ -73,7 +73,7 @@ function handleCommand(command: string, connection: Socket) {
     const commandToExec = command.split("]")[1];
     const terminal = map.get(uuid);
     if (terminal) {
-      terminal.stdin.write(commandToExec);
+      terminal.stdin.write(commandToExec + "\n");
     }
   } else if (command.startsWith("[kill:")) {
     // Syntax [kill:${uuid}]
